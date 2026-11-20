@@ -10,6 +10,7 @@ Visitante ──► Landing page (GitHub Pages)
                                 │  ferramenta: base_de_conhecimento
                                 ▼
                          Supabase (pgvector) ◄── ingestão do PDF do Google Drive
+                         embeddings: Gemini gemini-embedding-001 (3072)
                  ◄──────── { resposta }
 ```
 
@@ -20,7 +21,7 @@ Visitante ──► Landing page (GitHub Pages)
 | `index.html`, `assets/` | Landing page + widget de chat (HTML, CSS e JS puros) |
 | `assets/js/config.js` | **URL do webhook do n8n** (único arquivo a editar) |
 | `documentacao/` | Base de conhecimento fictícia (`.md` e `.pdf` para subir no Drive) |
-| `supabase/setup.sql` | Cria a tabela `suporte_zenite` e a função `match_suporte_zenite` |
+| `supabase/setup.sql` | Cria a tabela `suporte_zenite` (vetores de 3072 dimensões) e a função `match_suporte_zenite` |
 | `n8n/zenite-suporte-rag.json` | Workflow do n8n (ingestão + chat via webhook) |
 
 ## Passo a passo
@@ -35,7 +36,9 @@ Suba `documentacao/base-de-conhecimento-zenite.pdf` no seu Drive e copie o **ID 
 
 ### 3. n8n
 1. **Workflows → Import from File** → `n8n/zenite-suporte-rag.json`.
-2. Configure as credenciais: Google Drive, Supabase (URL + service_role), OpenAI (embeddings) e Google Gemini (chat).
+2. Configure as credenciais: Google Drive, Supabase e Google Gemini (usado no chat **e** nos embeddings, modelo `gemini-embedding-001`, 3072 dimensões).
+   - **Supabase → Host:** só `https://SEU-PROJETO.supabase.co` (sem `/rest/v1/`).
+   - **Supabase → Secret Key:** chave `service_role` ou `sb_secret_...` (não use a `anon`).
 3. No nó **Baixar PDF do Drive**, cole o ID do arquivo.
 4. Rode a ingestão: clique em **Execute workflow** no nó **Iniciar Ingestão**. Confira as linhas em `suporte_zenite` no Supabase.
 5. **Ative o workflow** (toggle *Active*) e copie a **Production URL** do nó **Webhook**.
@@ -71,6 +74,7 @@ curl -X POST "https://SEU-N8N/webhook/zenite-suporte" -H "Content-Type: applicat
 ```
 
 ## Observações
+- Os nós **Embeddings (Ingestão)** e **Embeddings (Consulta)** precisam usar o **mesmo modelo**. Se trocar o modelo, ajuste `vector(3072)` no SQL para a nova dimensão e rode a ingestão de novo (erro típico: `expected 1536 dimensions, not 3072`).
 - O n8n precisa estar acessível pela internet (n8n Cloud ou self-hosted com domínio/HTTPS). Um n8n em `localhost` não é alcançado pela página publicada.
 - O webhook aceita requisições de qualquer origem (`Allowed Origins: *`). Para restringir, troque pelo domínio do GitHub Pages no nó Webhook.
 - A URL do webhook fica visível no código do site, como em qualquer chat público.
