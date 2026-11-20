@@ -1,0 +1,295 @@
+{
+  "name": "Zênite Fibra – Chat de Suporte (RAG + Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 1) INGESTÃO DA DOCUMENTAÇÃO (rodar uma vez)\n1. Suba o **base-de-conhecimento-zenite.pdf** no Google Drive\n2. Cole o ID do arquivo no nó **Baixar PDF do Drive**\n3. Clique em **Execute workflow** neste trigger\n\nApaga a base antiga → baixa o PDF → divide em chunks → gera embeddings → grava na tabela **suporte_zenite** do Supabase.",
+        "height": 300,
+        "width": 1400,
+        "color": 4
+      },
+      "id": "2e000000-0001-4000-8000-000000000001",
+      "name": "Nota Ingestão",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, -360]
+    },
+    {
+      "parameters": {},
+      "id": "2e000000-0002-4000-8000-000000000002",
+      "name": "Iniciar Ingestão",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "suporte_zenite",
+        "filterType": "string",
+        "filterString": "id=gt.0"
+      },
+      "id": "2e000000-0003-4000-8000-000000000003",
+      "name": "Limpar Base Antiga",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": { "id": "", "name": "Supabase account" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "COLE_AQUI_O_ID_DO_PDF_NO_DRIVE",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "2e000000-0004-4000-8000-000000000004",
+      "name": "Baixar PDF do Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [440, 0],
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": { "id": "", "name": "Google Drive account" }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "suporte_zenite",
+          "mode": "list",
+          "cachedResultName": "suporte_zenite"
+        },
+        "options": {
+          "queryName": "match_suporte_zenite"
+        }
+      },
+      "id": "2e000000-0005-4000-8000-000000000005",
+      "name": "Gravar no Supabase",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.1,
+      "position": [680, 0],
+      "credentials": {
+        "supabaseApi": { "id": "", "name": "Supabase account" }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "id": "2e000000-0006-4000-8000-000000000006",
+      "name": "Embeddings (Ingestão)",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [600, 220],
+      "credentials": {
+        "openAiApi": { "id": "", "name": "OpenAI account" }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "loader": "pdfLoader",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              { "name": "fonte", "value": "base-de-conhecimento-zenite.pdf" },
+              { "name": "empresa", "value": "Zênite Fibra" }
+            ]
+          }
+        }
+      },
+      "id": "2e000000-0007-4000-8000-000000000007",
+      "name": "Carregar PDF",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [820, 220]
+    },
+    {
+      "parameters": {
+        "chunkSize": 800,
+        "chunkOverlap": 150,
+        "options": {}
+      },
+      "id": "2e000000-0008-4000-8000-000000000008",
+      "name": "Dividir em Chunks",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "content": "## 2) CHAT DA LANDING PAGE (webhook)\n**Ative o workflow** e copie a *Production URL* do nó Webhook para `assets/js/config.js` do site.\n\nA página envia `POST { sessionId, mensagem }` → o agente busca na base do Supabase → responde `{ resposta }`.\nA memória da conversa usa o `sessionId` de cada visitante.",
+        "height": 260,
+        "width": 1400,
+        "color": 5
+      },
+      "id": "2e000000-0009-4000-8000-000000000009",
+      "name": "Nota Chat",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, 600]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zenite-suporte",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "2e000000-0010-4000-8000-000000000010",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 920],
+      "webhookId": "9c3f6b1e-2a4d-4e8f-b7c5-0d1e2f3a4b5c"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.mensagem }}",
+        "options": {
+          "systemMessage": "Você é a **Lia**, assistente virtual de suporte da Zênite Fibra, uma provedora de internet por fibra óptica.\n\nComo trabalhar:\n1. Para QUALQUER pergunta sobre a Zênite (planos, preços, instalação, problemas de conexão, roteador, Wi-Fi, faturas, pagamentos, mudanças de contrato, cancelamento, contatos, cobertura), use SEMPRE a ferramenta \"base_de_conhecimento\" antes de responder.\n2. Responda somente com base nos trechos encontrados. Nunca invente preços, prazos, telefones ou regras.\n3. Se a informação não estiver na base, diga que não encontrou essa informação e oriente o cliente a falar com a central: 0800 000 1234.\n4. Cumprimentos e conversa simples (\"oi\", \"obrigado\") podem ser respondidos sem a ferramenta.\n5. Perguntas que não têm relação com a Zênite: explique com gentileza que você só ajuda com assuntos da Zênite Fibra.\n\nEstilo:\n- Português do Brasil, simpático, claro e objetivo.\n- Respostas curtas (até 6 frases). Para procedimentos, use lista numerada com passos curtos.\n- Pode usar **negrito** para destacar valores e prazos. Não use títulos, tabelas ou links em formato markdown.\n- Termine perguntando se pode ajudar em algo mais quando fizer sentido.\n\nSegurança:\n- Nunca peça senha, código SMS, número completo de cartão ou CPF completo.\n- Você não consegue acessar dados da conta do cliente, abrir chamados ou fazer alterações. Explique como o cliente pode fazer isso (app Minha Zênite, chat, 0800 000 1234 ou WhatsApp)."
+        }
+      },
+      "id": "2e000000-0011-4000-8000-000000000011",
+      "name": "Agente de Suporte (Lia)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [260, 920],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "2e000000-0012-4000-8000-000000000012",
+      "name": "Gemini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [120, 1140],
+      "credentials": {
+        "googlePalmApi": { "id": "", "name": "Google Gemini(PaLM) Api account" }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.sessionId || 'anonimo' }}",
+        "contextWindowLength": 10
+      },
+      "id": "2e000000-0013-4000-8000-000000000013",
+      "name": "Memória por Visitante",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [300, 1140]
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "base_de_conhecimento",
+        "toolDescription": "Busca na documentação oficial de suporte da Zênite Fibra: planos e preços, contratação, instalação, luzes do roteador, internet lenta ou sem conexão, Wi-Fi, chamados técnicos, faturas, segunda via, bloqueio, mudança de plano ou endereço, cancelamento, devolução de equipamentos, contatos e segurança.",
+        "tableName": {
+          "__rl": true,
+          "value": "suporte_zenite",
+          "mode": "list",
+          "cachedResultName": "suporte_zenite"
+        },
+        "topK": 6,
+        "options": {
+          "queryName": "match_suporte_zenite"
+        }
+      },
+      "id": "2e000000-0014-4000-8000-000000000014",
+      "name": "Base de Conhecimento (Supabase)",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.1,
+      "position": [500, 1140],
+      "credentials": {
+        "supabaseApi": { "id": "", "name": "Supabase account" }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "id": "2e000000-0015-4000-8000-000000000015",
+      "name": "Embeddings (Consulta)",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [580, 1340],
+      "credentials": {
+        "openAiApi": { "id": "", "name": "OpenAI account" }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"resposta\": {{ JSON.stringify($json.output || 'Desculpe, tive um problema para responder agora. Tente novamente em instantes ou ligue para 0800 000 1234.') }} }",
+        "options": {}
+      },
+      "id": "2e000000-0016-4000-8000-000000000016",
+      "name": "Responder ao Site",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [640, 920]
+    }
+  ],
+  "connections": {
+    "Iniciar Ingestão": {
+      "main": [[{ "node": "Limpar Base Antiga", "type": "main", "index": 0 }]]
+    },
+    "Limpar Base Antiga": {
+      "main": [[{ "node": "Baixar PDF do Drive", "type": "main", "index": 0 }]]
+    },
+    "Baixar PDF do Drive": {
+      "main": [[{ "node": "Gravar no Supabase", "type": "main", "index": 0 }]]
+    },
+    "Embeddings (Ingestão)": {
+      "ai_embedding": [[{ "node": "Gravar no Supabase", "type": "ai_embedding", "index": 0 }]]
+    },
+    "Carregar PDF": {
+      "ai_document": [[{ "node": "Gravar no Supabase", "type": "ai_document", "index": 0 }]]
+    },
+    "Dividir em Chunks": {
+      "ai_textSplitter": [[{ "node": "Carregar PDF", "type": "ai_textSplitter", "index": 0 }]]
+    },
+    "Webhook": {
+      "main": [[{ "node": "Agente de Suporte (Lia)", "type": "main", "index": 0 }]]
+    },
+    "Gemini": {
+      "ai_languageModel": [[{ "node": "Agente de Suporte (Lia)", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Memória por Visitante": {
+      "ai_memory": [[{ "node": "Agente de Suporte (Lia)", "type": "ai_memory", "index": 0 }]]
+    },
+    "Base de Conhecimento (Supabase)": {
+      "ai_tool": [[{ "node": "Agente de Suporte (Lia)", "type": "ai_tool", "index": 0 }]]
+    },
+    "Embeddings (Consulta)": {
+      "ai_embedding": [[{ "node": "Base de Conhecimento (Supabase)", "type": "ai_embedding", "index": 0 }]]
+    },
+    "Agente de Suporte (Lia)": {
+      "main": [[{ "node": "Responder ao Site", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
